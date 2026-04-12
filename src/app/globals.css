@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-accent: #3b82f6;
+  
+  --color-card-bg: #ffffff;
+  --color-card-border: #e5e7eb;
+  
+  --color-text-main: #111827;
+  --color-text-muted: #6b7280;
+  
+  --radius-premium: 16px;
+  --radius-modal: 32px;
+  
+  --shadow-premium: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+}
+
+@layer base {
+  :root {
+    --background: #f4f4f4;
+    --foreground: #171717;
+  }
+
+  .dark {
+    --background: #09090b;
+    --foreground: #fafafa;
+    
+    --color-card-bg: #18181b;
+    --color-card-border: #27272a;
+    --color-text-main: #f4f4f5;
+    --color-text-muted: #a1a1aa;
+  }
+
+  body {
+    @apply bg-[var(--background)] text-[var(--foreground)] transition-colors duration-300 antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/70 dark:bg-black/60 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-lg;
+  }
+  
+  .premium-input {
+    @apply bg-zinc-100 dark:bg-zinc-800 border-none rounded-[16px] px-4 py-3 focus:ring-2 focus:ring-blue-500 transition-all;
+  }
+}
+
+/* Custom Utilities for Smooth Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
