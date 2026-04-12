@@ -30,8 +30,8 @@ Nota di Sistema: "Pronta per l'elaborazione Antigravity."`;
 
 const MODELS_TO_TRY = [
   'gemini-1.5-flash',
-  'gemini-1.5-pro',
-  'gemini-2.0-flash'
+  'gemini-2.0-flash',
+  'gemini-1.5-pro'
 ];
 
 export async function generateWorkoutWithAI(prompt: string) {

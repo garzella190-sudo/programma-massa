@@ -699,14 +699,19 @@ export default function EditPlanModal({ isOpen, onClose, onSuccess, scheda }: Ed
                                   type="button"
                                   onClick={() => openPicker(ce.id)}
                                   className={cn(
-                                    "flex-1 flex items-center justify-between gap-3 px-4 py-2 rounded-xl border transition-all text-left",
+                                    "flex-1 flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border transition-all text-left shadow-sm",
                                     ce.nome 
-                                      ? "bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
+                                      ? "bg-blue-600 dark:bg-blue-500 border-blue-700 dark:border-blue-400 text-white"
                                       : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500"
                                   )}
                                 >
-                                   <span className="font-bold text-sm truncate">{ce.nome || "Scegli Esercizio..."}</span>
-                                   <ChevronRight size={14} className="opacity-50" />
+                                   <div className="flex items-center gap-2 truncate">
+                                     <Dumbbell className={cn("w-4 h-4 shrink-0", ce.nome ? "text-white/80" : "text-zinc-400")} />
+                                     <span className="font-black text-sm uppercase tracking-tight truncate">
+                                       {ce.nome || "Scegli Esercizio..."}
+                                     </span>
+                                   </div>
+                                   <ChevronRight size={14} className={cn("shrink-0", ce.nome ? "text-white/60" : "opacity-30")} />
                                 </button>
                                 <button onClick={() => removeExerciseFromCircuit(g.id, ce.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">
                                   <Trash2 size={14} />
