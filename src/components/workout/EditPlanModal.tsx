@@ -698,7 +698,12 @@ export default function EditPlanModal({ isOpen, onClose, onSuccess, scheda }: Ed
                                 <button
                                   type="button"
                                   onClick={() => openPicker(ce.id)}
-                                  className="flex-1 flex items-center justify-between gap-3 px-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-left"
+                                  className={cn(
+                                    "flex-1 flex items-center justify-between gap-3 px-4 py-2 rounded-xl border transition-all text-left",
+                                    ce.nome 
+                                      ? "bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
+                                      : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500"
+                                  )}
                                 >
                                    <span className="font-bold text-sm truncate">{ce.nome || "Scegli Esercizio..."}</span>
                                    <ChevronRight size={14} className="opacity-50" />
