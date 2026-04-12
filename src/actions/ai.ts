@@ -31,8 +31,6 @@ Nota di Sistema: "Pronta per l'elaborazione Antigravity."`;
 const MODELS_TO_TRY = [
   'gemini-1.5-flash',
   'gemini-1.5-pro',
-  'gemma-4-31b-it',
-  'gemma-4-26b-a4b-it',
   'gemini-2.0-flash'
 ];
 
@@ -54,7 +52,7 @@ export async function generateWorkoutWithAI(prompt: string) {
   for (const modelName of MODELS_TO_TRY) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // Increased to 20s
 
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`,
@@ -64,7 +62,10 @@ export async function generateWorkoutWithAI(prompt: string) {
           body: JSON.stringify({
             contents: [{ parts: [{ text: fullPrompt }] }],
             systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-            generationConfig: { temperature: 0.8 }
+            generationConfig: { 
+              temperature: 0.7,
+              maxOutputTokens: 2048,
+            }
           }),
           signal: controller.signal
         }
@@ -72,10 +73,19 @@ export async function generateWorkoutWithAI(prompt: string) {
 
       clearTimeout(timeoutId);
 
+      // Handle non-JSON or error responses gracefully
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        lastError = `Invalid response type: ${contentType}`;
+        continue;
+      }
+
       const data = await response.json();
+      
       if (!response.ok) {
-        lastError = data?.error?.message || 'Unknown error';
-        if (lastError.toLowerCase().includes('quota')) break; // Stop immediately if quota
+        lastError = data?.error?.message || `HTTP ${response.status}`;
+        console.error(`AI Action Error [${modelName}]:`, lastError);
+        if (lastError.toLowerCase().includes('quota')) break; 
         continue;
       }
 
@@ -86,20 +96,22 @@ export async function generateWorkoutWithAI(prompt: string) {
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
       if (lastError === 'The user aborted a request.') {
-        lastError = 'Timeout superato (Gemma 4 è lenta a rispondere)';
+        lastError = 'Timeout superato (L\'IA è lenta a rispondere)';
       }
+      console.error(`Fetch Exception [${modelName}]:`, lastError);
     }
   }
 
+  // Instead of throwing and causing a 500, return a specific error string
   if (lastError.toLowerCase().includes('quota')) {
-    throw new Error("Limite quota raggiunto (Gemma 4 è molto richiesto!). Riprova tra 60 secondi.");
+    return "ERRORE_IA: Limite quota raggiunto. Riprova tra 60 secondi.";
   }
 
-  if (lastError.toLowerCase().includes('high demand')) {
-    throw new Error("Gemma 4 è attualmente sovraccarico. Riprova tra pochi secondi.");
+  if (lastError.toLowerCase().includes('key') || lastError.toLowerCase().includes('not found')) {
+    return "ERRORE_IA: Chiave API non valida o mancante nelle impostazioni di Vercel.";
   }
 
-  throw new Error(`Gemma 4 Error: ${lastError}`);
+  return `ERRORE_IA: Errore durante l'elaborazione (${lastError})`;
 }
 
 export async function analyzeMuscleTargets(exercises: { nome: string; serie: number; reps: string }[]) {

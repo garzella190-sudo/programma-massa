@@ -535,13 +535,19 @@ export default function EditPlanModal({ isOpen, onClose, onSuccess, scheda }: Ed
     setAnalysisResult(null);
     try {
       const result = await analyzeMuscleTargets(validExercises);
-      setAnalysisResult(result);
-      showToast("Analisi completata!", "success");
-      // Scroll to result
-      setTimeout(() => {
-        const el = document.getElementById('ai-analysis-result');
-        el?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
+      
+      if (result.startsWith('ERRORE_IA:')) {
+        showToast(result.replace('ERRORE_IA:', '').trim(), "error");
+        setAnalysisResult(null);
+      } else {
+        setAnalysisResult(result);
+        showToast("Analisi completata!", "success");
+        // Scroll to result
+        setTimeout(() => {
+          const el = document.getElementById('ai-analysis-result');
+          el?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      }
     } catch (err) {
       console.error(err);
       showToast("Errore durante l'analisi", "error");
