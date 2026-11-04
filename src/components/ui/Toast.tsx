@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { CheckCircle2, AlertCircle, X } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type ToastType = 'success' | 'error' | 'info'
@@ -13,41 +13,59 @@ interface ToastProps {
   onClose: () => void
 }
 
+const ICONS = {
+  success: CheckCircle2,
+  error: AlertCircle,
+  info: Info,
+} as const
+
+const ACCENT = {
+  success: 'text-done',
+  error: 'text-danger',
+  info: 'text-accent',
+} as const
+
 export const Toast = ({ message, type = 'success', isVisible, onClose }: ToastProps) => {
-  const [internalVisible, setInternalVisible] = useState(false)
+  const [visibile, setVisibile] = useState(false)
 
   useEffect(() => {
-    if (isVisible) {
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      setInternalVisible(true)
-      const timer = setTimeout(() => {
-        setInternalVisible(false)
-        setTimeout(onClose, 300)
-      }, 3000)
-      return () => clearTimeout(timer)
-    } else {
-      setInternalVisible(false)
+    if (!isVisible) {
+      setVisibile(false)
+      return
     }
+    setVisibile(true)
+    const timer = setTimeout(() => {
+      setVisibile(false)
+      setTimeout(onClose, 200)
+    }, 3000)
+    return () => clearTimeout(timer)
   }, [isVisible, onClose])
 
-  if (!isVisible && !internalVisible) return null
+  if (!isVisible && !visibile) return null
+
+  const Icona = ICONS[type]
 
   return (
-    <div className={cn(
-      "fixed bottom-28 left-1/2 -translate-x-1/2 z-[200] transition-all duration-300 transform",
-      internalVisible ? "translate-y-0 opacity-100 scale-100" : "translate-y-4 opacity-0 scale-95"
-    )}>
-      <div className={cn(
-        "flex items-center gap-3 px-6 py-4 rounded-[20px] shadow-2xl backdrop-blur-md border",
-        type === 'success' ? "bg-emerald-500/90 border-emerald-400 text-white" :
-        type === 'error' ? "bg-red-500/90 border-red-400 text-white" :
-        "bg-zinc-800/90 border-zinc-700 text-white"
-      )}>
-        {type === 'success' && <CheckCircle2 size={20} className="animate-in zoom-in duration-300" />}
-        {type === 'error' && <AlertCircle size={20} className="animate-in zoom-in duration-300" />}
-        <p className="font-bold text-sm tracking-tight whitespace-nowrap">{message}</p>
-        <button onClick={() => { setInternalVisible(false); setTimeout(onClose, 300); }} className="ml-2 hover:opacity-70 p-1">
-          <X size={16} />
+    <div
+      role="status"
+      aria-live="polite"
+      className={cn(
+        'fixed left-1/2 -translate-x-1/2 bottom-[92px] z-[200] pointer-events-none transition-all duration-200',
+        visibile ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0',
+      )}
+    >
+      <div className="pointer-events-auto flex items-center gap-2.5 h-floating rounded-[12px] px-3.5 py-2.5 max-w-[90vw]">
+        <Icona className={cn('w-4 h-4 shrink-0', ACCENT[type])} />
+        <p className="text-[14px] font-semibold text-ink truncate">{message}</p>
+        <button
+          onClick={() => {
+            setVisibile(false)
+            setTimeout(onClose, 200)
+          }}
+          className="ml-1 p-1 text-ink-3 hover:text-ink"
+          aria-label="Chiudi notifica"
+        >
+          <X className="w-3.5 h-3.5" />
         </button>
       </div>
     </div>
@@ -66,7 +84,7 @@ export const useToast = () => {
   }
 
   const hideToast = () => {
-    setToast(prev => ({ ...prev, isVisible: false }))
+    setToast((prev) => ({ ...prev, isVisible: false }))
   }
 
   return { toast, showToast, hideToast }

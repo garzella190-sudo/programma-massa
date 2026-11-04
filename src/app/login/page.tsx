@@ -2,8 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Mail, Lock, Eye, EyeOff, Loader2, Sparkles, Activity } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Eye, EyeOff, Loader2, Sparkles, Activity } from 'lucide-react'
 import { signIn, signUp } from '@/actions/auth'
 
 export default function LoginPage() {
@@ -51,107 +50,99 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-[#f4f4f4] dark:bg-[#09090b] transition-colors duration-500 overflow-hidden relative">
-      {/* Background Decorative Elements */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 dark:bg-blue-900/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/10 dark:bg-blue-800/10 rounded-full blur-[120px] pointer-events-none" />
+    <div className="min-h-screen bg-canvas flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md animate-fade-in">
 
-      <div className="w-full max-w-md animate-fade-in relative z-10">
-        <div className="bg-white dark:bg-zinc-900 rounded-[32px] p-8 md:p-10 shadow-2xl border border-zinc-200 dark:border-zinc-800">
-          
-          <div className="flex flex-col items-center mb-10 text-center">
-            <div className="w-16 h-16 bg-blue-600 dark:bg-blue-500 rounded-[22px] flex items-center justify-center shadow-lg shadow-blue-500/20 mb-6 group hover:scale-105 transition-transform duration-300">
-              <Activity className="w-8 h-8 text-white animate-pulse" />
-            </div>
-            <h1 className="text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-50 mb-2">
-              Allenamenti <span className="text-blue-600 dark:text-blue-500 italic">Manu</span>
-            </h1>
-            <p className="text-zinc-500 dark:text-zinc-400 font-medium max-w-[240px]">
-              {mode === 'signin' ? 'Bentornato! Accedi al tuo piano personalizzato.' : 'Crea il tuo account per iniziare.'}
-            </p>
+        {/* Logo + titolo */}
+        <div className="flex flex-col items-center text-center mb-8">
+          <div className="w-16 h-16 rounded-[16px] bg-accent flex items-center justify-center mb-5">
+            <Activity className="w-8 h-8 text-white" />
           </div>
-
-          <form onSubmit={handleAuth} className="space-y-5">
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-zinc-400 dark:text-zinc-500 ml-1 uppercase tracking-widest flex items-center gap-2">
-                <Mail className="w-3 h-3" /> Email
-              </label>
-              <div className="relative group">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@example.com"
-                  required
-                  className="w-full bg-zinc-100 dark:bg-zinc-800/50 border-none rounded-[16px] px-5 py-4 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:ring-2 focus:ring-blue-500/50 transition-all outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-zinc-400 dark:text-zinc-500 ml-1 uppercase tracking-widest flex items-center gap-2">
-                <Lock className="w-3 h-3" /> Password
-              </label>
-              <div className="relative group">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  className="w-full bg-zinc-100 dark:bg-zinc-800/50 border-none rounded-[16px] px-5 py-4 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:ring-2 focus:ring-blue-500/50 transition-all outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-blue-500 transition-colors p-1"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            {error && (
-              <div className="p-4 rounded-[16px] bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 text-sm font-medium flex items-center gap-3 animate-fade-in">
-                <span className="shrink-0 w-2 h-2 rounded-full bg-red-500" />
-                {error}
-              </div>
-            )}
-
-            {success && (
-              <div className="p-4 rounded-[16px] bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-sm font-medium flex items-center gap-3 animate-fade-in">
-                <span className="shrink-0 w-2 h-2 rounded-full bg-emerald-500" />
-                {success}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-bold py-4 rounded-[16px] shadow-lg shadow-blue-600/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
-            >
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  <Sparkles className="w-5 h-5" />
-                  {mode === 'signin' ? 'Accedi' : 'Registrati'}
-                </>
-              )}
-            </button>
-          </form>
-
-          <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800 text-center">
-            <button
-              onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-              className="text-sm font-semibold text-zinc-500 hover:text-blue-600 dark:text-zinc-400 dark:hover:text-blue-400 transition-colors"
-            >
-              {mode === 'signin' ? 'Non hai un account? Registrati' : 'Hai già un account? Accedi'}
-            </button>
-          </div>
+          <h1 className="h-title">Allenamenti Manu</h1>
+          <p className="h-caption mt-2 max-w-[260px]">
+            {mode === 'signin' ? 'Bentornato! Accedi al tuo piano personalizzato.' : 'Crea il tuo account per iniziare.'}
+          </p>
         </div>
-        
-        <p className="mt-8 text-center text-zinc-400 dark:text-zinc-600 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2">
+
+        <form onSubmit={handleAuth} className="space-y-4">
+          <div>
+            <label htmlFor="login-email" className="h-field-label">Email</label>
+            <input
+              id="login-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@example.com"
+              required
+              className="h-field"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="login-password" className="h-field-label">Password</label>
+            <div className="relative">
+              <input
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                className="h-field pr-12"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-icon-btn"
+                aria-label={showPassword ? 'Nascondi password' : 'Mostra password'}
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[10px] bg-danger/16 border border-danger/30 text-danger text-[13px] font-semibold animate-fade-in">
+              <span className="shrink-0 w-2 h-2 rounded-full bg-danger" />
+              <span className="min-w-0">{error}</span>
+            </div>
+          )}
+
+          {success && (
+            <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[10px] bg-done/16 border border-done/30 text-done text-[13px] font-semibold animate-fade-in">
+              <span className="shrink-0 w-2 h-2 rounded-full bg-done" />
+              <span className="min-w-0">{success}</span>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="h-btn h-btn-primary w-full"
+          >
+            {loading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                {mode === 'signin' ? 'Accedi' : 'Registrati'}
+              </>
+            )}
+          </button>
+        </form>
+
+        <div className="h-divider mt-7 mb-5" />
+
+        <div className="text-center">
+          <button
+            onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
+            className="text-[14px] font-semibold text-accent py-2.5 px-3"
+          >
+            {mode === 'signin' ? 'Non hai un account? Registrati' : 'Hai già un account? Accedi'}
+          </button>
+        </div>
+
+        <p className="mt-6 h-caption text-center text-ink-3">
           Made with Passion for the 93kg Goal
         </p>
       </div>

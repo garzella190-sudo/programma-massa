@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Outfit } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import SWRegister from "@/components/SWRegister";
-import { createClient } from "@/utils/supabase/server";
 
-const outfit = Outfit({
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-outfit",
+  variable: "--font-inter",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#09090b",
+  themeColor: "#0E1116",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -50,15 +50,9 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
   return (
-    <html
-      lang="it"
-      className={`${outfit.variable} h-full antialiased`}
-    >
-      <body className={`${outfit.className} min-h-full flex flex-col bg-zinc-950 text-zinc-50`}>
+    <html lang="it" className={`${inter.variable} h-full`}>
+      <body className="min-h-full flex flex-col bg-canvas text-ink">
         {children}
         <SWRegister />
       </body>

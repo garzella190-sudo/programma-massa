@@ -1,202 +1,277 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Search, Plus, Dumbbell, History, Sparkles, Loader2 } from 'lucide-react'
+import { X, Search, Plus, Dumbbell, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { suggestExercisesWithAI } from '@/actions/ai'
-
-const COMMON_EXERCISES = [
-  "Panca Piana", "Panca Inclinata", "Squat", "Stacco da Terra", 
-  "Trazioni alla Sbarra", "Rematore", "Military Press", "Curl Bilanciere",
-  "Pushdown Tricipiti", "Leg Press", "Leg Extension", "Leg Curl", 
-  "Lat Machine", "Pulley", "Alzati Laterali"
-];
+import { EsercizioCatalogo } from '@/types/workout'
+import { getEserciziCatalogo, creaEsercizioCatalogo } from '@/actions/workout'
 
 interface ExercisePickerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (exerciseName: string) => void;
-  customExercises?: string[];
+  onSelect: (exercise: EsercizioCatalogo) => void;
 }
 
-export function ExercisePickerModal({ isOpen, onClose, onSelect, customExercises = [] }: ExercisePickerModalProps) {
+const GRUPPI_MUSCOLARI = [
+  'Tutti', 'Petto', 'Dorso', 'Gambe', 'Spalle', 'Bicipiti', 'Tricipiti', 'Addome', 'Cardio'
+]
+
+export function ExercisePickerModal({ isOpen, onClose, onSelect }: ExercisePickerModalProps) {
+  const [exercises, setExercises] = useState<EsercizioCatalogo[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [recentExercises, setRecentExercises] = useState<string[]>([])
-  const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
-  const [isSearchingAI, setIsSearchingAI] = useState(false)
+  const [selectedMuscle, setSelectedMuscle] = useState('Tutti')
+
+  // Custom exercise creation state
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [newExName, setNewExName] = useState('')
+  const [newExMuscle, setNewExMuscle] = useState('Petto')
+  const [newExEquipment, setNewExEquipment] = useState('Manubri')
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden'
-      const saved = localStorage.getItem('recent_exercises')
-      if (saved) {
-        try {
-          setRecentExercises(JSON.parse(saved))
-        } catch (e) {}
-      }
+      fetchExercises()
     } else {
       document.body.style.overflow = ''
+      setShowCreateForm(false)
+      setNewExName('')
     }
     return () => {
       document.body.style.overflow = ''
     }
   }, [isOpen])
 
+  const fetchExercises = async () => {
+    try {
+      setLoading(true)
+      const data = await getEserciziCatalogo()
+      setExercises(data)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (!isOpen) return null
 
-  const allExercises = Array.from(new Set([...COMMON_EXERCISES, ...customExercises]))
-  const filtered = allExercises.filter(ex => 
-    ex.toLowerCase().includes(searchTerm.toLowerCase())
-  ).sort((a, b) => a.localeCompare(b))
+  const filtered = exercises.filter(ex => {
+    const matchesSearch = ex.nome.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesMuscle = selectedMuscle === 'Tutti' || ex.gruppo_muscolare === selectedMuscle
+    return matchesSearch && matchesMuscle
+  })
 
-  const handleSelect = (name: string) => {
-    // Salva nei recenti
-    const newRecent = [name, ...recentExercises.filter(ex => ex !== name)].slice(0, 5)
-    setRecentExercises(newRecent)
-    localStorage.setItem('recent_exercises', JSON.stringify(newRecent))
-    
-    onSelect(name)
+  const handleSelect = (ex: EsercizioCatalogo) => {
+    onSelect(ex)
     onClose()
   }
 
-  const handleAISuggest = async () => {
-    if (!searchTerm.trim()) return;
-    setIsSearchingAI(true);
+  const handleCreateExercise = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newExName.trim()) return
+
     try {
-      const suggestions = await suggestExercisesWithAI(searchTerm);
-      setAiSuggestions(suggestions);
+      setCreating(true)
+      const newEx = await creaEsercizioCatalogo(newExName.trim(), newExMuscle, newExEquipment)
+      if (newEx) {
+        onSelect(newEx)
+        onClose()
+      }
     } catch (err) {
-      console.error(err);
+      console.error(err)
     } finally {
-      setIsSearchingAI(false);
+      setCreating(false)
     }
   }
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-start justify-center bg-zinc-900/60 dark:bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-zinc-950 rounded-b-[32px] md:rounded-[32px] shadow-2xl w-full max-w-lg overflow-hidden border-b border-x md:border border-zinc-200 dark:border-zinc-800 flex flex-col max-h-[92vh] md:max-h-[90vh] md:mt-10">
+    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center sm:p-4">
+      <div className="h-scrim" onClick={onClose} />
+
+      <div className="relative z-50 w-full sm:max-w-lg h-sheet sm:rounded-sheet animate-sheet-in flex flex-col max-h-[92vh] sm:max-h-[85vh]">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-zinc-100 dark:border-zinc-900">
-          <div>
-            <h2 className="text-xl font-black text-zinc-900 dark:text-white uppercase tracking-tight">Scegli Esercizio</h2>
-            <p className="text-xs text-zinc-500 font-medium">Seleziona dalla lista o cerca</p>
+        <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-line">
+          <div className="min-w-0">
+            <p className="h-label">Catalogo</p>
+            <h2 className="h-card-title mt-1 truncate">Scegli esercizio</h2>
           </div>
-          <button 
-            onClick={onClose}
-            className="p-3 rounded-2xl hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-500 transition-all active:scale-95"
-          >
+          <button onClick={onClose} className="h-icon-btn shrink-0" aria-label="Chiudi">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Search */}
-        <div className="p-6 pb-2">
-          <div className="relative group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-blue-500 transition-colors" />
-            <input 
-              autoFocus
-              type="text"
-              placeholder="Cerca esercizio..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl py-4 pl-12 pr-4 text-zinc-900 dark:text-white placeholder:text-zinc-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
-            />
-          </div>
-        </div>
-
-        {/* List */}
-        <div className="flex-1 overflow-y-auto p-6 pt-2 space-y-6">
-          {/* Recenti */}
-          {recentExercises.length > 0 && !searchTerm && (
+        {showCreateForm ? (
+          /* FORM CREAZIONE */
+          <form onSubmit={handleCreateExercise} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
             <div>
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-3 ml-1">Usati di recente</h3>
-              <div className="grid grid-cols-1 gap-2">
-                {recentExercises.map((ex) => (
+              <p className="h-label mb-1">Nuovo esercizio personalizzato</p>
+              <p className="h-caption">Verrà salvato nel catalogo e aggiunto alla scheda.</p>
+            </div>
+
+            <div>
+              <label className="h-field-label">Nome esercizio</label>
+              <input
+                type="text"
+                required
+                placeholder="es. Affondi in avanzamento"
+                value={newExName}
+                onChange={(e) => setNewExName(e.target.value)}
+                className="h-field"
+              />
+            </div>
+
+            <div>
+              <label className="h-field-label">Gruppo muscolare</label>
+              <select
+                value={newExMuscle}
+                onChange={(e) => setNewExMuscle(e.target.value)}
+                className="h-field"
+              >
+                {GRUPPI_MUSCOLARI.filter(m => m !== 'Tutti').map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="h-field-label">Attrezzatura</label>
+              <select
+                value={newExEquipment}
+                onChange={(e) => setNewExEquipment(e.target.value)}
+                className="h-field"
+              >
+                <option value="Manubri">Manubri</option>
+                <option value="Bilanciere">Bilanciere</option>
+                <option value="Cavi">Cavi</option>
+                <option value="Macchina">Macchina</option>
+                <option value="Corpo libero">Corpo libero</option>
+                <option value="Elastico">Elastico</option>
+                <option value="Kettlebell">Kettlebell</option>
+              </select>
+            </div>
+
+            <div className="pt-2 pb-1 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCreateForm(false)}
+                className="h-btn h-btn-neutral flex-1"
+              >
+                Annulla
+              </button>
+              <button
+                type="submit"
+                disabled={creating}
+                className="h-btn h-btn-primary flex-1"
+              >
+                {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Salva e aggiungi'}
+              </button>
+            </div>
+          </form>
+        ) : (
+          /* SELEZIONE E RICERCA */
+          <>
+            {/* Search and Filters */}
+            <div className="px-4 pt-3 pb-2 space-y-2 border-b border-line">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-3 pointer-events-none" />
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Cerca esercizio…"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-field pl-9 min-h-[44px]"
+                />
+              </div>
+
+              {/* Muscle Filters */}
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-0.5">
+                {GRUPPI_MUSCOLARI.map((muscle) => (
                   <button
-                    key={`recent-${ex}`}
-                    onClick={() => handleSelect(ex)}
-                    className="flex items-center gap-3 p-4 rounded-2xl bg-blue-50 dark:bg-blue-900/10 text-zinc-900 dark:text-zinc-100 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all text-left group"
+                    key={muscle}
+                    onClick={() => setSelectedMuscle(muscle)}
+                    className={cn(
+                      'whitespace-nowrap shrink-0 px-3 py-2 transition-colors',
+                      selectedMuscle === muscle ? 'h-chip-accent' : 'h-chip active:bg-raised'
+                    )}
                   >
-                    <History className="w-4 h-4 text-blue-500" />
-                    <span className="font-bold flex-1">{ex}</span>
-                    <Plus className="w-4 h-4 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    {muscle}
                   </button>
                 ))}
               </div>
             </div>
-          )}
 
-          {/* Tutti gli esercizi */}
-          <div>
-            <div className="flex justify-between items-center mb-3 ml-1">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
-                {searchTerm ? 'Risultati ricerca' : 'Tutti gli esercizi'}
-              </h3>
-              {searchTerm && (
-                <button 
-                  onClick={handleAISuggest}
-                  disabled={isSearchingAI}
-                  className="text-[10px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-600 flex items-center gap-1.5 transition-colors disabled:opacity-50"
-                >
-                  {isSearchingAI ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                  Suggerimenti IA
-                </button>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 gap-2">
-              {/* Risultati IA */}
-              {aiSuggestions.length > 0 && searchTerm && (
-                <div className="space-y-2 mb-4 animate-in fade-in slide-in-from-top-1 duration-300">
-                  {aiSuggestions.map((ex) => (
+            {/* List */}
+            <div className="flex-1 overflow-y-auto">
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-20 text-ink-2">
+                  <Loader2 className="w-7 h-7 animate-spin text-accent mb-3" />
+                  <p className="h-caption">Caricamento catalogo…</p>
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="px-4 py-10 text-center">
+                  <Dumbbell className="w-8 h-8 text-ink-3 mx-auto mb-3" />
+                  <p className="h-card-title mb-1">Nessun risultato</p>
+                  <p className="h-caption mb-4">Nessun esercizio corrisponde alla ricerca.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewExName(searchTerm)
+                      setShowCreateForm(true)
+                    }}
+                    className="h-btn h-btn-tonal w-full"
+                  >
+                    <Plus className="w-4 h-4" />
+                    {`Aggiungi "${searchTerm || 'Nuovo'}" al catalogo`}
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <p className="h-label px-4 pt-3 pb-2 tnum">
+                    {filtered.length} {filtered.length === 1 ? 'esercizio' : 'esercizi'}
+                  </p>
+                  {filtered.map((ex) => (
                     <button
-                      key={`ai-${ex}`}
+                      key={ex.id}
                       onClick={() => handleSelect(ex)}
-                      className="flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10 border border-blue-100 dark:border-blue-900/30 text-zinc-900 dark:text-zinc-100 hover:scale-[1.01] transition-all text-left group"
+                      className="h-row w-full px-4 text-left active:bg-field transition-colors"
                     >
-                      <Sparkles className="w-4 h-4 text-blue-500" />
-                      <span className="font-bold flex-1">{ex}</span>
-                      <Plus className="w-4 h-4 text-blue-500 opacity-60" />
+                      <div className="w-9 h-9 shrink-0 rounded-[8px] bg-accent-soft text-accent flex items-center justify-center">
+                        <Dumbbell className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="h-card-title truncate">{ex.nome}</p>
+                        <p className="h-caption truncate">
+                          {ex.gruppo_muscolare} · {ex.attrezzatura}
+                        </p>
+                      </div>
+                      <Plus className="w-4 h-4 shrink-0 text-ink-3" />
                     </button>
                   ))}
-                  <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-2" />
                 </div>
               )}
-
-              {filtered.map((ex) => (
-                <button
-                  key={ex}
-                  onClick={() => handleSelect(ex)}
-                  className="flex items-center gap-3 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-100 dark:border-zinc-800/50 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all text-left group"
-                >
-                  <Dumbbell className="w-4 h-4 text-zinc-400 group-hover:text-blue-500 transition-colors" />
-                  <span className="font-bold flex-1">{ex}</span>
-                  <Plus className="w-4 h-4 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </button>
-              ))}
-              
-              {filtered.length === 0 && !isSearchingAI && aiSuggestions.length === 0 && (
-                <button
-                  onClick={() => handleSelect(searchTerm)}
-                  className="flex items-center gap-3 p-4 rounded-2xl bg-blue-600 text-white hover:bg-blue-700 transition-all text-left"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span className="font-bold flex-1">Aggiungi nuovo: "{searchTerm}"</span>
-                </button>
-              )}
             </div>
-          </div>
-        </div>
 
-        {/* Footer */}
-        <div className="p-6 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-100 dark:border-zinc-800">
-           <button 
-            onClick={onClose}
-            className="w-full py-4 rounded-2xl bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-all active:scale-95"
-           >
-             Chiudi
-           </button>
-        </div>
+            {/* Footer */}
+            <div className="px-4 py-3 border-t border-line flex gap-2 bg-card">
+              <button
+                onClick={() => setShowCreateForm(true)}
+                className="h-btn h-btn-tonal flex-1"
+              >
+                <Plus className="w-4 h-4" />
+                Crea nuovo
+              </button>
+              <button
+                onClick={onClose}
+                className="h-btn h-btn-neutral flex-1"
+              >
+                Chiudi
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

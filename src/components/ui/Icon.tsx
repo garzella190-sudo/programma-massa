@@ -13,9 +13,18 @@ import {
   Activity, 
   Download, 
   Settings, 
-  Key 
+  Key,
+  Check,
+  Flame,
+  History,
+  Trophy,
+  Plus,
+  Play,
+  Square,
+  MoreVertical
 } from "lucide-react";
 import { WorkoutIcon } from "@/types/workout";
+import { LucideIcon as LucideIconType } from "lucide-react";
 
 interface IconProps {
   name: WorkoutIcon;
@@ -23,7 +32,7 @@ interface IconProps {
 }
 
 export const Icon = ({ name, className = "w-5 h-5" }: IconProps) => {
-  const icons = {
+  const icons: Record<string, LucideIconType> = {
     Clock,
     Coffee,
     Dumbbell,
@@ -38,10 +47,19 @@ export const Icon = ({ name, className = "w-5 h-5" }: IconProps) => {
     Activity,
     Download,
     Settings,
-    Key
+    Key,
+    Check,
+    Flame,
+    History,
+    Trophy,
+    Plus,
+    Play,
+    Square,
+    MoreVertical
   };
 
   const LucideIcon = icons[name] || Clock;
   
   return <LucideIcon className={className} />;
 };
+

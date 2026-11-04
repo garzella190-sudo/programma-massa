@@ -1,11 +1,13 @@
-'use client'
+import DietSchedule from '@/components/diet/DietSchedule'
 
-import WorkoutSchedule from "@/components/workout/WorkoutSchedule";
+export const metadata = {
+  title: 'Dieta | Allenamenti Manu',
+}
 
 export default function DietaPage() {
   return (
-    <main className="flex flex-col min-h-screen">
-      <WorkoutSchedule />
+    <main className="flex-1 flex flex-col">
+      <DietSchedule />
     </main>
-  );
+  )
 }

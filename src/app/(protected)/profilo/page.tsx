@@ -1,13 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { User, Ruler, Scale, Flame, Award, Save, Loader2, ChevronLeft } from 'lucide-react'
+import { User, Save, Loader2, Calendar, Clock, Trash2, LogOut } from 'lucide-react'
 import { getProfile, updateProfile, Profile } from '@/actions/profile'
+import { getStoricoAllenamenti, eliminaAllenamento } from '@/actions/workout'
 import { Toast, useToast } from '@/components/ui/Toast'
+import { ConfirmBubble } from '@/components/ui/ConfirmBubble'
+import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { cn } from '@/lib/utils'
 
 export default function ProfiloPage() {
+  const [activeTab, setActiveTab] = useState<'diario' | 'biometria'>('diario')
   const [profile, setProfile] = useState<Profile>({
     altezza: 180,
     peso: 80,
@@ -15,165 +19,367 @@ export default function ProfiloPage() {
     consumo_calorico: 2500,
     obiettivi: ''
   })
+  const [history, setHistory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   
   const { toast, showToast, hideToast } = useToast()
   const router = useRouter()
+  const supabase = createClient()
 
   useEffect(() => {
-    const fetch = async () => {
-      const data = await getProfile()
-      if (data) {
-        setProfile({
-          altezza: data.altezza,
-          peso: data.peso,
-          esperienza: data.esperienza,
-          consumo_calorico: data.consumo_calorico,
-          obiettivi: data.obiettivi
-        })
-      }
-      setLoading(false)
-    }
-    fetch()
+    fetchData()
   }, [])
 
-  const handleSave = async () => {
+  const fetchData = async () => {
+    setLoading(true)
+    try {
+      const profData = await getProfile()
+      if (profData) {
+        setProfile({
+          altezza: profData.altezza,
+          peso: profData.peso,
+          esperienza: profData.esperienza,
+          consumo_calorico: profData.consumo_calorico,
+          obiettivi: profData.obiettivi
+        })
+      }
+      
+      const historyData = await getStoricoAllenamenti()
+      setHistory(historyData)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSaveProfile = async () => {
     setSaving(true)
     const res = await updateProfile(profile)
     if (res.success) {
-      showToast("Profilo aggiornato con successo!", "success")
+      showToast("Biometria salvata!", "success")
     } else {
-      showToast("Errore durante l'aggiornamento", "error")
+      showToast("Errore salvataggio", "error")
     }
     setSaving(false)
   }
 
+  const handleDeleteWorkout = async (id: string) => {
+    try {
+      const res = await eliminaAllenamento(id)
+      if (res.success) {
+        showToast("Allenamento rimosso dallo storico", "success")
+        setHistory(prev => prev.filter(w => w.id !== id))
+      } else {
+        showToast(res.error || "Errore rimozione", "error")
+      }
+    } catch (err) {
+      console.error(err)
+      showToast("Errore di rete", "error")
+    }
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
+
+  // Calcola volume totale per un allenamento
+  const calculateVolume = (serieList: any[]) => {
+    return serieList.reduce((acc, curr) => acc + (Number(curr.peso || 0) * Number(curr.reps || 0)), 0)
+  }
+
+  // Calcola durata in minuti
+  const calculateDuration = (start: string, end: string) => {
+    const s = new Date(start).getTime()
+    const e = new Date(end).getTime()
+    const diffMin = Math.round((e - s) / 60000)
+    return diffMin > 0 ? `${diffMin} min` : '1 min'
+  }
+
+  // Raggruppa serie per esercizio
+  const getEserciziRaggruppati = (serieList: any[]) => {
+    const map: Record<string, { nome: string; serie: any[] }> = {}
+    serieList.forEach(s => {
+      const exName = s.esercizio?.nome || 'Esercizio'
+      if (!map[exName]) {
+        map[exName] = { nome: exName, serie: [] }
+      }
+      map[exName].serie.push(s)
+    })
+    return Object.values(map)
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#09090b]">
-        <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
+      <div className="min-h-screen bg-canvas flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-accent mx-auto mb-3" />
+          <p className="h-caption">Caricamento…</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen p-4 md:p-8 pb-32 bg-[#f4f4f4] dark:bg-[#09090b] transition-colors duration-500">
-      <div className="max-w-2xl mx-auto">
-        
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-10">
-          <Link 
-            href="/schede"
-            className="p-3 rounded-2xl bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-all shadow-sm border border-zinc-200 dark:border-zinc-800"
+    <div className="min-h-screen bg-canvas pb-nav">
+      <div className="max-w-3xl mx-auto px-4 pt-6">
+
+        {/* Header identità */}
+        <header className="mb-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="shrink-0 w-12 h-12 rounded-full bg-raised border border-line flex items-center justify-center">
+                <User className="w-6 h-6 text-accent" />
+              </div>
+              <h1 className="h-title min-w-0">Profilo &amp; Diario</h1>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="h-icon-btn shrink-0 hover:text-danger"
+              title="Logout"
+              aria-label="Logout"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
+          <p className="h-caption mt-2">Storico allenamenti e parametri personali</p>
+        </header>
+
+        {/* Tabs switcher */}
+        <div className="h-segmented mb-4">
+          <button
+            onClick={() => setActiveTab('diario')}
+            className={cn(
+              'h-segmented-item min-h-[44px]',
+              activeTab === 'diario' && 'h-segmented-item-active'
+            )}
           >
-            <ChevronLeft className="w-6 h-6 text-zinc-500" />
-          </Link>
-          <div>
-            <h1 className="text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-3 lowercase">
-              Pagina <span className="text-blue-600 dark:text-blue-500">Utente</span>
-            </h1>
-            <p className="text-zinc-500 dark:text-zinc-400 font-medium lowercase">Dati biometrici per l'ottimizzazione IA</p>
-          </div>
-        </div>
-
-        {/* Profile Card */}
-        <div className="bg-white dark:bg-zinc-900 rounded-[32px] p-6 md:p-10 shadow-xl shadow-zinc-200/50 dark:shadow-black/20 border border-white dark:border-zinc-800">
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            
-            {/* Altezza */}
-            <div className="space-y-3">
-              <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400 ml-1">
-                Altezza (cm)
-              </label>
-              <div className="relative">
-                <input 
-                  type="number"
-                  value={profile.altezza}
-                  onChange={(e) => setProfile({...profile, altezza: Number(e.target.value)})}
-                  className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 rounded-2xl px-5 py-4 text-xl font-black text-zinc-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
-                />
-              </div>
-            </div>
-
-            {/* Peso */}
-            <div className="space-y-3">
-              <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400 ml-1">
-                Peso Corporeo (kg)
-              </label>
-              <div className="relative">
-                <input 
-                  type="number"
-                  value={profile.peso}
-                  onChange={(e) => setProfile({...profile, peso: Number(e.target.value)})}
-                  className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 rounded-2xl px-5 py-4 text-xl font-black text-zinc-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
-                />
-              </div>
-            </div>
-
-            {/* Consumo Calorico */}
-            <div className="space-y-3">
-              <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400 ml-1">
-                Consumo Calorico Medio
-              </label>
-              <div className="relative">
-                <input 
-                  type="number"
-                  value={profile.consumo_calorico}
-                  onChange={(e) => setProfile({...profile, consumo_calorico: Number(e.target.value)})}
-                  className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 rounded-2xl px-5 py-4 text-xl font-black text-zinc-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
-                />
-              </div>
-            </div>
-
-            {/* Esperienza */}
-            <div className="space-y-3">
-              <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400 ml-1">
-                Livello Esperienza
-              </label>
-              <select 
-                value={profile.esperienza}
-                onChange={(e) => setProfile({...profile, esperienza: e.target.value})}
-                className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 rounded-2xl px-5 py-4 text-lg font-black text-zinc-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all appearance-none"
-              >
-                <option value="Principiante">Principiante</option>
-                <option value="Intermedio">Intermedio</option>
-                <option value="Avanzato">Avanzato</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Obiettivi */}
-          <div className="mt-8 space-y-3">
-            <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400 ml-1">
-              Obiettivi & Note
-            </label>
-            <textarea 
-              value={profile.obiettivi}
-              onChange={(e) => setProfile({...profile, obiettivi: e.target.value})}
-              placeholder="E.g. Aumento massa, miglioramento forza panca..."
-              className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 rounded-[24px] px-5 py-4 min-h-[120px] font-bold text-zinc-800 dark:text-zinc-100 outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
-            />
-          </div>
-
-          <button 
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full mt-10 py-5 bg-blue-600 hover:bg-blue-700 text-white rounded-[24px] font-black text-sm uppercase tracking-widest shadow-xl shadow-blue-500/20 transition-all active:scale-95 flex items-center justify-center gap-3"
-          >
-            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-            {saving ? 'Salvataggio...' : 'Salva Profilo'}
+            Diario allenamenti
           </button>
-
+          <button
+            onClick={() => setActiveTab('biometria')}
+            className={cn(
+              'h-segmented-item min-h-[44px]',
+              activeTab === 'biometria' && 'h-segmented-item-active'
+            )}
+          >
+            Dati biometrici
+          </button>
         </div>
 
-        {/* Info Box */}
-        <div className="mt-8 p-6 bg-blue-50 dark:bg-blue-900/10 rounded-[28px] border border-blue-100 dark:border-blue-900/20">
-          <p className="text-blue-700 dark:text-blue-400 text-sm font-bold leading-relaxed">
-            I tuoi dati vengono utilizzati dall'Advanced Fitness Architect per calcolare intensità, volume e parametri tecnici dei workout generati con l'IA.
-          </p>
-        </div>
+        {/* TAB CONTENUTO */}
+        {activeTab === 'diario' ? (
+          /* DIARIO (STORICO WORKOUTS) */
+          <div className="space-y-3">
+            {history.length === 0 ? (
+              <div className="h-card border-dashed p-8 text-center">
+                <Calendar className="w-8 h-8 text-ink-3 mx-auto mb-3" />
+                <p className="h-card-title mb-1">Nessun allenamento registrato</p>
+                <p className="h-caption max-w-xs mx-auto">
+                  Inizia il tuo primo allenamento nella scheda Allenamento per popolarne la cronologia.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {history.map((w) => {
+                  const volume = calculateVolume(w.serie || [])
+                  const duration = calculateDuration(w.inizio_at, w.fine_at)
+                  const esercizi = getEserciziRaggruppati(w.serie || [])
+
+                  return (
+                    <div key={w.id} className="h-card p-3.5 space-y-3">
+                      
+                      {/* Titolo e Data */}
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="min-w-0">
+                          <h3 className="h-card-title truncate">{w.nome}</h3>
+                          <div className="flex items-center gap-1.5 mt-1 h-caption">
+                            <span className="tnum">
+                              {new Date(w.inizio_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </span>
+                            <span className="text-ink-3">•</span>
+                            <span className="flex items-center gap-1 tnum">
+                              <Clock className="w-3 h-3 text-ink-3" /> {duration}
+                            </span>
+                          </div>
+                        </div>
+
+                        <ConfirmBubble
+                          title="Elimina Allenamento"
+                          message="Sei sicuro di voler eliminare definitivamente questa sessione?"
+                          onConfirm={() => handleDeleteWorkout(w.id)}
+                          trigger={
+                            <button className="h-icon-btn hover:text-danger" title="Elimina allenamento" aria-label="Elimina allenamento">
+                              <Trash2 size={16} />
+                            </button>
+                          }
+                        />
+                      </div>
+
+                      {/* Note */}
+                      {w.note && (
+                        <p className="h-caption italic bg-field/60 border border-line/60 rounded-[8px] px-3 py-2">
+                          {w.note}
+                        </p>
+                      )}
+
+                      {/* Statistiche rapide — Metric Stat */}
+                      <div className="grid grid-cols-2 gap-3 py-2.5 border-y border-line">
+                        <div>
+                          <span className="h-label block">Volume totale</span>
+                          <span className="h-metric tnum block mt-1">
+                            {volume} <span className="text-[13px] font-semibold text-ink-2">kg</span>
+                          </span>
+                        </div>
+                        <div>
+                          <span className="h-label block">Serie totali</span>
+                          <span className="h-metric tnum block mt-1">{w.serie?.length || 0}</span>
+                        </div>
+                      </div>
+
+                      {/* Esercizi */}
+                      <div className="space-y-2">
+                        {esercizi.map((ex, exIdx) => (
+                          <div key={exIdx} className="space-y-1.5">
+                            <span className="h-label block">{ex.nome}</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {ex.serie.map((s, sIdx) => (
+                                <span
+                                  key={s.id}
+                                  className={cn(
+                                    'h-chip tnum',
+                                    s.tipo === 'Failure' && 'bg-danger/16 text-danger',
+                                    s.tipo === 'Drop' && 'bg-accent-soft text-accent'
+                                  )}
+                                >
+                                  {sIdx + 1}. {s.peso}kg x {s.reps}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* BIOMETRIA (DATI UTENTE) */
+          <div className="space-y-3">
+            {/* Metric stats */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="h-card p-3">
+                <p className="h-label">Altezza</p>
+                <p className="h-metric tnum mt-1">
+                  {profile.altezza} <span className="text-[13px] font-semibold text-ink-2">cm</span>
+                </p>
+              </div>
+              <div className="h-card p-3">
+                <p className="h-label">Peso</p>
+                <p className="h-metric tnum mt-1">
+                  {profile.peso} <span className="text-[13px] font-semibold text-ink-2">kg</span>
+                </p>
+              </div>
+              <div className="h-card p-3">
+                <p className="h-label">Esperienza</p>
+                <p className="h-metric mt-1 truncate">{profile.esperienza}</p>
+              </div>
+              <div className="h-card p-3">
+                <p className="h-label">Calorie target</p>
+                <p className="h-metric tnum mt-1">
+                  {profile.consumo_calorico} <span className="text-[13px] font-semibold text-ink-2">kcal</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Form biometria */}
+            <div className="h-card p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                {/* Altezza */}
+                <div>
+                  <label htmlFor="profilo-altezza" className="h-field-label">Altezza (cm)</label>
+                  <input
+                    id="profilo-altezza"
+                    type="number"
+                    value={profile.altezza}
+                    onChange={(e) => setProfile({...profile, altezza: Number(e.target.value)})}
+                    className="h-field tnum"
+                  />
+                </div>
+
+                {/* Peso */}
+                <div>
+                  <label htmlFor="profilo-peso" className="h-field-label">Peso (kg)</label>
+                  <input
+                    id="profilo-peso"
+                    type="number"
+                    value={profile.peso}
+                    onChange={(e) => setProfile({...profile, peso: Number(e.target.value)})}
+                    className="h-field tnum"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Consumo Calorico */}
+                <div>
+                  <label htmlFor="profilo-calorie" className="h-field-label">Calorie target</label>
+                  <input
+                    id="profilo-calorie"
+                    type="number"
+                    value={profile.consumo_calorico}
+                    onChange={(e) => setProfile({...profile, consumo_calorico: Number(e.target.value)})}
+                    className="h-field tnum"
+                  />
+                </div>
+
+                {/* Esperienza */}
+                <div>
+                  <label htmlFor="profilo-esperienza" className="h-field-label">Esperienza</label>
+                  <select
+                    id="profilo-esperienza"
+                    value={profile.esperienza}
+                    onChange={(e) => setProfile({...profile, esperienza: e.target.value})}
+                    className="h-field appearance-none"
+                  >
+                    <option value="Principiante">Principiante</option>
+                    <option value="Intermedio">Intermedio</option>
+                    <option value="Avanzato">Avanzato</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Obiettivi */}
+              <div>
+                <label htmlFor="profilo-obiettivi" className="h-field-label">Obiettivi &amp; note</label>
+                <textarea
+                  id="profilo-obiettivi"
+                  value={profile.obiettivi}
+                  onChange={(e) => setProfile({...profile, obiettivi: e.target.value})}
+                  placeholder="Aumento massa, miglioramento panca..."
+                  rows={3}
+                  className="h-field resize-none"
+                />
+              </div>
+
+              <button
+                onClick={handleSaveProfile}
+                disabled={saving}
+                className="h-btn h-btn-primary w-full"
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Salva profilo
+              </button>
+            </div>
+          </div>
+        )}
 
       </div>
 

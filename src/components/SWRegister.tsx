@@ -85,30 +85,28 @@ export default function SWRegister() {
   if (!showUpdatePrompt) return null;
 
   return (
-    <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 p-4 rounded-[32px] shadow-2xl flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20">
-            <RefreshCw className="text-white animate-spin" size={18} />
+    <div className="fixed bottom-[92px] left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-md animate-fade-in">
+      <div className="h-floating rounded-[16px] p-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-[10px] bg-accent-soft text-accent flex items-center justify-center shrink-0">
+            <RefreshCw className="animate-spin" size={16} />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-black text-zinc-900 dark:text-zinc-50 leading-tight uppercase tracking-tight">Nuova Versione!</p>
-            <p className="text-[11px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Aggiorna per le novità</p>
+            <p className="h-card-title">Nuova versione</p>
+            <p className="h-caption mt-0.5">Aggiorna per le novità</p>
           </div>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleUpdate}
-            className="h-10 bg-blue-600 hover:bg-blue-700 text-white px-5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-md shadow-blue-500/20"
-          >
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button onClick={handleUpdate} className="h-btn h-btn-primary px-4">
             Aggiorna
           </button>
           <button
             onClick={() => setShowUpdatePrompt(false)}
-            className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
+            className="h-icon-btn"
+            aria-label="Chiudi"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
       </div>

@@ -1,44 +1,54 @@
 'use client'
 
-import { usePathname, useRouter } from "next/navigation";
-import { ClipboardList, Dumbbell, UtensilsCrossed } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { usePathname, useRouter } from 'next/navigation'
+import { ClipboardList, Dumbbell, Search, UtensilsCrossed, User } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
-export const BottomNav = () => {
-  const pathname = usePathname();
-  const router = useRouter();
+const NAV_ITEMS = [
+  { label: 'Schede', icon: ClipboardList, path: '/schede' },
+  { label: 'Workout', icon: Dumbbell, path: '/allenamento' },
+  { label: 'Esercizi', icon: Search, path: '/esercizi' },
+  { label: 'Dieta', icon: UtensilsCrossed, path: '/dieta' },
+  { label: 'Profilo', icon: User, path: '/profilo' },
+]
 
-  const navItems = [
-    { label: "Schede", icon: ClipboardList, path: "/schede" },
-    { label: "Allenamento", icon: Dumbbell, path: "/allenamento" },
-    { label: "Dieta", icon: UtensilsCrossed, path: "/dieta" },
-  ];
+/**
+ * Bottom tab bar stile Hevy: 5 voci, label sempre visibili,
+ * stato attivo = colore accent + soft fill sull'icona (nessuna pillola).
+ */
+export function BottomNav() {
+  const pathname = usePathname()
+  const router = useRouter()
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.4)] border border-white/20 dark:border-white/10 z-50">
-      {navItems.map((item) => {
-        const isActive = pathname === item.path;
-        const Icon = item.icon;
+    <nav className="fixed bottom-0 inset-x-0 z-50 border-t border-line bg-canvas/95 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]">
+      <div className="max-w-lg mx-auto flex items-stretch h-[68px] px-1">
+        {NAV_ITEMS.map((item) => {
+          const attivo = pathname === item.path
+          const Icon = item.icon
 
-        return (
-          <button
-            key={item.path}
-            onClick={() => router.push(item.path)}
-            className={cn(
-              "flex items-center gap-2 px-5 py-3 rounded-[24px] transition-all duration-300 group",
-              isActive 
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20 px-7" 
-                : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-            )}
-          >
-            <Icon className={cn(
-              "w-5 h-5",
-              !isActive && "group-hover:scale-110 transition-transform"
-            )} />
-            {isActive && <span className="font-bold text-xs tracking-tight">{item.label}</span>}
-          </button>
-        );
-      })}
-    </div>
-  );
-};
+          return (
+            <button
+              key={item.path}
+              onClick={() => router.push(item.path)}
+              aria-current={attivo ? 'page' : undefined}
+              className="flex-1 flex flex-col items-center justify-center gap-1 min-w-0"
+            >
+              <span
+                className={cn(
+                  'flex items-center justify-center w-9 h-7 rounded-[8px] transition-colors',
+                  attivo ? 'bg-accent/16 text-accent' : 'text-ink-3',
+                )}
+              >
+                <Icon className="w-[22px] h-[22px]" strokeWidth={attivo ? 2.4 : 2} />
+              </span>
+              <span className={cn('h-tab-label truncate max-w-full px-0.5', attivo ? 'text-accent' : 'text-ink-3')}>
+                {item.label}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </nav>
+  )
+}
