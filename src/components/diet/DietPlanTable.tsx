@@ -5,6 +5,7 @@ import { Check, Loader2, Pill, Plus, Sparkles, Trash2, X } from 'lucide-react'
 import { aggiungiRiga, aggiornaRiga, eliminaRiga } from '@/actions/alimentazione'
 import { suggestFoodsWithAI } from '@/actions/ai'
 import { cn } from '@/lib/utils'
+import { FEATURES } from '@/lib/features'
 import type { ToastType } from '@/components/ui/Toast'
 import {
   componiVoce,
@@ -224,21 +225,23 @@ export function DietPlanTable({ piano, integrazioni, onRefresh, onToast }: DietP
                       placeholder={etichetta}
                       className="h-field h-9 flex-1 text-[15px] border-accent pr-10"
                     />
-                    <button
-                      onClick={() => void suggerisci()}
-                      disabled={suggerendo}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-accent disabled:opacity-40"
-                      title="Suggerimenti IA"
-                    >
-                      {suggerendo ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Sparkles className="w-4 h-4" />
-                      )}
-                    </button>
+                    {FEATURES.chatDieta && (
+                      <button
+                        onClick={() => void suggerisci()}
+                        disabled={suggerendo}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-accent disabled:opacity-40"
+                        title="Suggerimenti IA"
+                      >
+                        {suggerendo ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
                   </div>
 
-                  {suggerimenti.length > 0 && (
+                  {FEATURES.chatDieta && suggerimenti.length > 0 && (
                     <div className="absolute left-0 right-0 top-full mt-1.5 z-50 h-floating rounded-[12px] overflow-hidden animate-fade-in">
                       <p className="h-label px-3 py-2 border-b border-line">Suggerimenti IA</p>
                       {suggerimenti.map((s, i) => (
@@ -366,19 +369,21 @@ export function DietPlanTable({ piano, integrazioni, onRefresh, onToast }: DietP
                 </>
               ) : (
                 <>
-                  <button
-                    onClick={() =>
-                      setRigaAi({
-                        items: pasto || riga.voce,
-                        qty: riga.quantita,
-                        phase: fase || riga.orario,
-                      })
-                    }
-                    className="w-8 h-8 flex items-center justify-center rounded-[8px] text-ink-3 hover:text-accent hover:bg-field"
-                    title="Chiedi all'AI"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                  </button>
+                  {FEATURES.chatDieta && (
+                    <button
+                      onClick={() =>
+                        setRigaAi({
+                          items: pasto || riga.voce,
+                          qty: riga.quantita,
+                          phase: fase || riga.orario,
+                        })
+                      }
+                      className="w-8 h-8 flex items-center justify-center rounded-[8px] text-ink-3 hover:text-accent hover:bg-field"
+                      title="Chiedi all'AI"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                    </button>
+                  )}
                   {!riga.isIntegration && (
                     <button
                       onClick={() => void elimina(riga.id)}
