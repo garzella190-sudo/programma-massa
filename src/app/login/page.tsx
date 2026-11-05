@@ -1,9 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Eye, EyeOff, Loader2, Sparkles, Activity } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Eye, EyeOff, Loader2, Sparkles, Activity, AlertTriangle } from 'lucide-react'
 import { signIn, signUp } from '@/actions/auth'
+
+interface StatoBackend {
+  ok: boolean
+  dettaglio?: string | null
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -13,8 +17,26 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [success, setSuccess] = useState<string | null>(null)
-  
-  const router = useRouter()
+  const [backend, setBackend] = useState<StatoBackend | null>(null)
+
+  // Diagnostica: se il backend non risponde lo diciamo prima che l'utente digiti
+  // le credenziali (evita il generico "Failed to fetch").
+  useEffect(() => {
+    let annullato = false
+
+    fetch('/api/health', { cache: 'no-store' })
+      .then((r) => r.json() as Promise<StatoBackend & { dettaglio?: string | null }>)
+      .then((dati) => {
+        if (!annullato) setBackend({ ok: Boolean(dati.ok), dettaglio: dati.dettaglio ?? null })
+      })
+      .catch(() => {
+        if (!annullato) setBackend({ ok: false, dettaglio: 'Diagnostica non raggiungibile.' })
+      })
+
+    return () => {
+      annullato = true
+    }
+  }, [])
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,8 +64,12 @@ export default function LoginPage() {
           setSuccess(result.success)
         }
       }
-    } catch (err: any) {
-      setError(err.message || "Si è verificato un errore durante l'autenticazione.")
+    } catch (err) {
+      setError(
+        err instanceof Error && err.message
+          ? err.message
+          : "Si è verificato un errore durante l'autenticazione.",
+      )
     } finally {
       setLoading(false)
     }
@@ -63,6 +89,15 @@ export default function LoginPage() {
             {mode === 'signin' ? 'Bentornato! Accedi al tuo piano personalizzato.' : 'Crea il tuo account per iniziare.'}
           </p>
         </div>
+
+        {backend && !backend.ok && (
+          <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-[10px] bg-warn/16 border border-warn/30 text-warn text-[13px] font-semibold mb-4 animate-fade-in">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span className="min-w-0">
+              Backend non raggiungibile. {backend.dettaglio ?? 'Controlla la configurazione di Supabase.'}
+            </span>
+          </div>
+        )}
 
         <form onSubmit={handleAuth} className="space-y-4">
           <div>

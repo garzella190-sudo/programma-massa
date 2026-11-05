@@ -1,13 +1,12 @@
 import { createBrowserClient } from '@supabase/ssr'
+import { ERRORE_CONFIG, leggiConfigSupabase } from './config'
 
 export function createClient() {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    // Return a dummy client or handle the error gracefully during build
-    return null as any; 
+  const { url, anonKey, configurato } = leggiConfigSupabase()
+
+  if (!configurato || !url || !anonKey) {
+    throw new Error(ERRORE_CONFIG)
   }
 
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
+  return createBrowserClient(url, anonKey)
 }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'allenamenti-manu-v4'; // Versione v4 per bypass cache iOS
+const CACHE_NAME = 'allenamenti-manu-v5'; // Versione v4 per bypass cache iOS
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',
