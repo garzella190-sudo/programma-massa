@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { leggiConfigSupabase, safeHost } from '@/utils/supabase/config'
+import { leggiConfigIA } from '@/lib/ai/config'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,8 +8,10 @@ export const dynamic = 'force-dynamic'
  * GET /api/health
  * Diagnostica del backend: verifica che le variabili Supabase siano presenti
  * e che il progetto risponda davvero (utile quando il login dà "Failed to fetch").
+ * Riporta anche se l'IA è configurata e con quale provider.
  */
 export async function GET() {
+  const ia = leggiConfigIA()
   const { url, configurato } = leggiConfigSupabase()
 
   if (!configurato || !url) {
@@ -18,6 +21,7 @@ export async function GET() {
         configurato: false,
         dettaglio:
           'Mancano NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY nelle variabili d\u2019ambiente.',
+        ia: { configurata: ia.configurata, provider: ia.provider, modello: ia.modello },
       },
       { status: 503 },
     )
@@ -38,6 +42,7 @@ export async function GET() {
         host,
         stato: risposta.status,
         dettaglio: risposta.ok ? null : `Supabase ha risposto con stato ${risposta.status}.`,
+        ia: { configurata: ia.configurata, provider: ia.provider, modello: ia.modello },
       },
       { status: risposta.ok ? 200 : 503 },
     )
@@ -49,6 +54,7 @@ export async function GET() {
         configurato: true,
         host,
         dettaglio: `DNS o connessione fallita verso ${host}: il progetto Supabase potrebbe essere eliminato o in pausa.`,
+        ia: { configurata: ia.configurata, provider: ia.provider, modello: ia.modello },
       },
       { status: 503 },
     )

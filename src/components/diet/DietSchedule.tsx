@@ -1,8 +1,23 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowDownToLine, Loader2, MessageSquare, Pill, Plus, Sparkles, UtensilsCrossed } from 'lucide-react'
-import { creaPiano, creaPianoIA, getPiani, migraPianoMassa } from '@/actions/alimentazione'
+import {
+  ArrowDownToLine,
+  Loader2,
+  MessageSquare,
+  Pill,
+  Plus,
+  RotateCcw,
+  Sparkles,
+  UtensilsCrossed,
+} from 'lucide-react'
+import {
+  creaPiano,
+  creaPianoIA,
+  getPiani,
+  migraPianoMassa,
+  ripristinaPianoMassa,
+} from '@/actions/alimentazione'
 import { generateDietPlanWithAI } from '@/actions/ai'
 import { Toast, useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
@@ -18,6 +33,7 @@ export default function DietSchedule() {
   const [espansoId, setEspansoId] = useState<string | null>(null)
   const [assistenteAperto, setAssistenteAperto] = useState(false)
   const [generandoIa, setGenerandoIa] = useState(false)
+  const [ripristinando, setRipristinando] = useState(false)
   const { toast, showToast, hideToast } = useToast()
 
   const carica = useCallback(
@@ -72,7 +88,7 @@ export default function DietSchedule() {
       showToast('Piano generato dall\u2019IA', 'success')
     } catch (error) {
       console.error(error)
-      showToast('Errore generazione piano IA', 'error')
+      showToast(error instanceof Error ? error.message : 'Errore generazione piano IA', 'error')
     } finally {
       setGenerandoIa(false)
     }
@@ -85,6 +101,25 @@ export default function DietSchedule() {
       showToast('Piano Massa migrato', 'success')
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Errore migrazione', 'error')
+    }
+  }
+
+  /** Ricrea il piano originale dai dati inclusi nell'app (nessuna dipendenza dal DB storico). */
+  const ripristinaDati = async () => {
+    if (ripristinando) return
+    setRipristinando(true)
+    try {
+      const creati = await ripristinaPianoMassa()
+      await carica(true)
+      showToast(
+        creati.length > 0 ? 'Piano Massa ripristinato' : 'I piani esistono già',
+        creati.length > 0 ? 'success' : 'info',
+      )
+    } catch (error) {
+      console.error(error)
+      showToast('Errore nel ripristino del piano', 'error')
+    } finally {
+      setRipristinando(false)
     }
   }
 
@@ -148,9 +183,23 @@ export default function DietSchedule() {
           <div className="h-card border-dashed p-8 text-center">
             <Icona className="w-8 h-8 text-ink-3 mx-auto mb-3" />
             <p className="h-card-title mb-1">Nessun piano presente</p>
-            <p className="h-caption">Crea un nuovo piano oppure migra i dati del Piano Massa.</p>
-            <button onClick={() => void migraDatiStorici()} className="h-btn h-btn-neutral mt-4">
-              <ArrowDownToLine className="w-4 h-4" /> Migra Piano Massa
+            <p className="h-caption mb-4">
+              Ripristina il Piano Massa originale (14 voci già incluse) oppure crea un piano nuovo.
+            </p>
+            <button
+              onClick={() => void ripristinaDati()}
+              disabled={ripristinando}
+              className="h-btn h-btn-primary w-full"
+            >
+              {ripristinando ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RotateCcw className="w-4 h-4" />
+              )}
+              Ripristina Piano Massa
+            </button>
+            <button onClick={() => void migraDatiStorici()} className="h-btn h-btn-neutral w-full mt-2">
+              <ArrowDownToLine className="w-4 h-4" /> Migra da dati storici
             </button>
           </div>
         ) : (

@@ -33,7 +33,7 @@ export function DietRowAiModal({ isOpen, onClose, riga }: DietRowAiModalProps) {
       setResponse(await callGemini(prompt))
     } catch (error) {
       console.error(error)
-      setResponse("Errore durante la comunicazione con l'IA.")
+      setResponse(error instanceof Error ? error.message : "Errore durante la comunicazione con l'IA.")
     } finally {
       setLoading(false)
     }

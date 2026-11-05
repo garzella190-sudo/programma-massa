@@ -80,15 +80,26 @@ Gli esercizi vengono raggruppati per `nome` in visualizzazione.
 ### Alimentazione
 - Un piano alimentare può avere un piano di **integrazione abbinato**; le sue righe vengono
   mostrate in coda (tinta `accent`) e sono in sola lettura.
-- Le righe si modificano **inline** (click sulla cella → input → Invio/Esc).
-- I piani possono essere creati a mano, generati dall'IA (CSV `Orario | Voce | Quantità | Note`)
-  o migrati dal vecchio `programma_giornaliero` (bottone "Migra Piano Massa").
+- Nel DB la **fase** è il prefisso della voce (`"Colazione — Yogurt e Muesli"`):
+  `separaFase()` / `componiVoce()` in `types/diet.ts` fanno da ponte con la UI e con il PDF.
+- Le righe si modificano **inline** (tap sul valore → input → Invio/Esc).
+- I piani possono essere creati a mano, generati dall'IA (CSV `Orario | Voce | Quantità | Note`),
+  migrati dal vecchio `programma_giornaliero` o **ripristinati dai dati originali** inclusi
+  nell'app (`lib/seedPianoMassa.ts` → 14 voci del Piano Massa, nessuna dipendenza dal DB storico).
+
+### Intelligenza artificiale
+- `lib/ai/config.ts` sceglie il provider: **OpenAI-compatibile** (`AI_BASE_URL` + `AI_API_KEY`,
+  es. OpenRouter/DeepSeek/OpenAI/Groq) oppure **Gemini** (`GEMINI_API_KEY`, modelli aggiornati).
+- `actions/ai.ts` lancia `Error` con messaggi già leggibili (`messaggioErroreIA`): chiave leaked,
+  chiave non valida, quota esaurita, rete.
+- Lo stato è esposto da `GET /api/health` (`ia: { configurata, provider, modello }`).
 
 ### Esportazione PDF
-`src/lib/pdf/pianoAlimentare.ts` genera un PDF A4 con header blu, tabella compatta e sezione
-"integrazione abbinata". jsPDF è caricato **on-demand** al primo click (`await import('jspdf')`),
-così non pesa sul bundle iniziale. L'API pubblica è `esportaPianoPdf(piano, { integrazione })`
-e va invocata da componenti client.
+`src/lib/pdf/pianoAlimentare.ts` genera un PDF A4 con header blu, colonne
+`ORARIO · FASE · PASTO · QUANTITÀ · NOTE` e sezione "integrazione abbinata".
+La route `GET /api/pdf/piano/[id]` la esegue **lato server** (`serverExternalPackages: ['jspdf']`),
+quindi il client non paga peso né il problema dell'import opzionale `canvg`.
+Il bottone "Esporta PDF" è sempre visibile nella card del piano (icona nell'header + bottone etichettato).
 
 ---
 

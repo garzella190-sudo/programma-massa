@@ -1,8 +1,15 @@
 'use server'
 
 import { getProfile } from './profile'
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+import {
+  baseUrlOpenAI,
+  chiaveGemini,
+  chiaveOpenAI,
+  leggiConfigIA,
+  messaggioErroreIA,
+  modelloOpenAI,
+  modelliGemini,
+} from '@/lib/ai/config'
 
 const SYSTEM_PROMPT = `Sei l'Advanced Fitness Architect dell'ecosistema Antigravity, integrato con il modello Gemma 4.
 
@@ -26,152 +33,202 @@ DIRETTIVE DI RISPOSTA:
 
 DATI BIOMETRICI: Utilizza sempre Altezza, Peso ed Esperienza forniti per personalizzare i consigli. Se mancano, usa uno standard intermedio (80kg).
 
-Nota di Sistema: "Pronta per l'elaborazione Antigravity."`;
+Nota di Sistema: "Pronta per l'elaborazione Antigravity."`
 
-const MODELS_TO_TRY = [
-  'gemini-1.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-pro'
-];
+const TIMEOUT_MS = 30_000
 
-export async function generateWorkoutWithAI(prompt: string) {
-  const profile = await getProfile();
-  
-  const userContext = profile 
-    ? `\n\nDATI UTENTE ATTUALI:\n- Altezza: ${profile.altezza}cm\n- Peso: ${profile.peso}kg\n- Esperienza: ${profile.esperienza}\n- Consumo Calorico: ${profile.consumo_calorico}kcal\n- Obiettivi: ${profile.obiettivi || 'Massa/Forza'}`
-    : '\n\nDATI UTENTE: Non disponibili. Usa parametri standard per un atleta intermedio di 80kg.';
+/** Rimuove i grassetti Markdown: l'app mostra testo semplice. */
+function normalizza(testo: string): string {
+  return testo.replace(/\*\*/g, '').trim()
+}
 
-  const fullPrompt = `${prompt}${userContext}`;
+// ─── Provider compatibile OpenAI (AI_BASE_URL + AI_API_KEY) ────────────
 
-  if (!GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY not found.');
+async function chiamaOpenAICompatible(prompt: string): Promise<string> {
+  const base = baseUrlOpenAI()
+  const chiave = chiaveOpenAI()
+  if (!base || !chiave) throw new Error('Provider IA non configurato.')
+
+  let risposta: Response
+  try {
+    risposta = await fetch(`${base}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${chiave}`,
+      },
+      body: JSON.stringify({
+        model: modelloOpenAI(),
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 2048,
+      }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    })
+  } catch (errore) {
+    throw new Error(messaggioErroreIA({ messaggio: errore instanceof Error ? errore.message : '' }))
   }
 
-  let lastError = '';
+  const dati = (await risposta.json().catch(() => null)) as
+    | { choices?: { message?: { content?: string } }[]; error?: { message?: string } }
+    | null
 
-  for (const modelName of MODELS_TO_TRY) {
+  if (!risposta.ok) {
+    throw new Error(messaggioErroreIA({ status: risposta.status, messaggio: dati?.error?.message }))
+  }
+
+  const testo = dati?.choices?.[0]?.message?.content
+  if (!testo) throw new Error(messaggioErroreIA({ status: risposta.status }))
+  return normalizza(testo)
+}
+
+// ─── Google Gemini (chiave nativa) ─────────────────────────────────────
+
+async function chiamaGemini(prompt: string): Promise<string> {
+  const chiave = chiaveGemini()
+  if (!chiave) throw new Error('Chiave Gemini non configurata.')
+
+  let ultimoErrore = ''
+
+  for (const modello of modelliGemini()) {
+    let risposta: Response
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); // Increased to 20s
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`,
+      risposta = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modello}:generateContent?key=${chiave}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: fullPrompt }] }],
+            contents: [{ parts: [{ text: prompt }] }],
             systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-            generationConfig: { 
-              temperature: 0.7,
-              maxOutputTokens: 2048,
-            }
+            generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
           }),
-          signal: controller.signal
-        }
-      );
-
-      clearTimeout(timeoutId);
-
-      // Handle non-JSON or error responses gracefully
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        lastError = `Invalid response type: ${contentType}`;
-        continue;
-      }
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        lastError = data?.error?.message || `HTTP ${response.status}`;
-        console.error(`AI Action Error [${modelName}]:`, lastError);
-        if (lastError.toLowerCase().includes('quota')) break; 
-        continue;
-      }
-
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text) {
-        return text.replace(/\*\*/g, '');
-      }
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
-      if (lastError === 'The user aborted a request.') {
-        lastError = 'Timeout superato (L\'IA è lenta a rispondere)';
-      }
-      console.error(`Fetch Exception [${modelName}]:`, lastError);
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        },
+      )
+    } catch (errore) {
+      ultimoErrore = errore instanceof Error ? errore.message : String(errore)
+      continue
     }
+
+    const dati = (await risposta.json().catch(() => null)) as
+      | {
+          candidates?: { content?: { parts?: { text?: string }[] } }[]
+          error?: { message?: string; status?: string }
+        }
+      | null
+
+    if (!risposta.ok) {
+      ultimoErrore = dati?.error?.message ?? `HTTP ${risposta.status}`
+      // Chiave bloccata/leaked o non valida: inutile provare altri modelli.
+      if (
+        risposta.status === 401 ||
+        risposta.status === 403 ||
+        /leaked|api key not valid/i.test(ultimoErrore)
+      ) {
+        throw new Error(messaggioErroreIA({ status: risposta.status, messaggio: ultimoErrore }))
+      }
+      continue
+    }
+
+    const testo = dati?.candidates?.[0]?.content?.parts?.[0]?.text
+    if (testo) return normalizza(testo)
+    ultimoErrore = 'Risposta vuota dal modello'
   }
 
-  // Instead of throwing and causing a 500, return a specific error string
-  if (lastError.toLowerCase().includes('quota')) {
-    return "ERRORE_IA: Limite quota raggiunto. Riprova tra 60 secondi.";
-  }
+  throw new Error(messaggioErroreIA({ messaggio: ultimoErrore }))
+}
 
-  if (lastError.toLowerCase().includes('key') || lastError.toLowerCase().includes('not found')) {
-    return "ERRORE_IA: Chiave API non valida o mancante nelle impostazioni di Vercel.";
-  }
+// ─── API pubblica ───────────────────────────────────────────────────────
 
-  return `ERRORE_IA: Errore durante l'elaborazione (${lastError})`;
+/**
+ * Genera testo con il provider IA configurato.
+ * Lancia un Error con messaggio già leggibile in caso di problemi.
+ */
+export async function generateWorkoutWithAI(prompt: string): Promise<string> {
+  const config = leggiConfigIA()
+  if (!config.configurata || !config.provider) throw new Error(config.dettaglio)
+
+  const profile = await getProfile()
+  const contesto = profile
+    ? `\n\nDATI UTENTE ATTUALI:\n- Altezza: ${profile.altezza}cm\n- Peso: ${profile.peso}kg\n- Esperienza: ${profile.esperienza}\n- Consumo Calorico: ${profile.consumo_calorico}kcal\n- Obiettivi: ${profile.obiettivi || 'Massa/Forza'}`
+    : '\n\nDATI UTENTE: Non disponibili. Usa parametri standard per un atleta intermedio di 80kg.'
+
+  const promptCompleto = `${prompt}${contesto}`
+
+  return config.provider === 'openai-compatibile'
+    ? chiamaOpenAICompatible(promptCompleto)
+    : chiamaGemini(promptCompleto)
+}
+
+/** Stato della configurazione IA (per diagnostica). */
+export async function statoIA() {
+  return leggiConfigIA()
 }
 
 export async function analyzeMuscleTargets(exercises: { nome: string; serie: number; reps: string }[]) {
-  const profile = await getProfile();
-  
-  const exercisesList = exercises.map(ex => `- ${ex.nome}: ${ex.serie} serie x ${ex.reps} reps`).join('\n');
-  
+  const profile = await getProfile()
+  const elenco = exercises.map((ex) => `- ${ex.nome}: ${ex.serie} serie x ${ex.reps} reps`).join('\n')
+
   const prompt = `Analizza dettagliatamente questa scheda di allenamento. Per ogni esercizio, spiega:
   1. Quali muscoli primari e secondari vengono coinvolti.
   2. La biomeccanica del movimento (perché è efficace).
   3. Come si inserisce nel mio obiettivo di ipertrofia.
-  
-  Esercizi:\n${exercisesList}`;
-  
-  const userContext = profile 
-    ? `\n\nDATI UTENTE:\n- Altezza: ${profile.altezza}cm\n- Peso: ${profile.peso}kg\n- Esperienza: ${profile.esperienza}\n- Obiettivi: ${profile.obiettivi}`
-    : '';
 
-  const fullPrompt = `${prompt}${userContext}`;
-  
-  return generateWorkoutWithAI(fullPrompt);
+  Esercizi:\n${elenco}${
+    profile
+      ? `\n\nDATI UTENTE:\n- Altezza: ${profile.altezza}cm\n- Peso: ${profile.peso}kg\n- Esperienza: ${profile.esperienza}\n- Obiettivi: ${profile.obiettivi}`
+      : ''
+  }`
+
+  return generateWorkoutWithAI(prompt)
 }
 
 export async function suggestExercisesWithAI(term: string) {
-  const prompt = `Gemma 4, agisci come assistente Antigravity. Proponi una lista di massimo 5 esercizi di bodybuilding/fitness correlati a: "${term}".
-  Rispondi SOLO con i nomi degli esercizi, uno per riga, senza numeri o descrizioni.`;
-  
-  const res = await generateWorkoutWithAI(prompt);
-  return res.split('\n').map((s: string) => s.trim()).filter(Boolean);
+  const prompt = `Agisci come assistente di bodybuilding/fitness. Proponi una lista di massimo 5 esercizi correlati a: "${term}".
+  Rispondi SOLO con i nomi degli esercizi, uno per riga, senza numeri o descrizioni.`
+
+  const res = await generateWorkoutWithAI(prompt)
+  return res
+    .split('\n')
+    .map((s) => s.replace(/^[-*\d.\s]+/, '').trim())
+    .filter(Boolean)
 }
 
 export async function suggestFoodsWithAI(term: string) {
-  const prompt = `Gemma 4, agisci come nutrizionista sportivo. Proponi una lista di massimo 4 pasti o alimenti sani e adatti alla massa muscolare correlati a: "${term}".
-  Rispondi SOLO con i nomi degli alimenti, uno per riga, senza numeri o calorie.`;
-  
-  const res = await generateWorkoutWithAI(prompt);
-  return res.split('\n').map((s: string) => s.trim()).filter(Boolean);
+  const prompt = `Agisci come nutrizionista sportivo. Proponi una lista di massimo 4 pasti o alimenti sani e adatti alla massa muscolare correlati a: "${term}".
+  Rispondi SOLO con i nomi degli alimenti, uno per riga, senza numeri o calorie.`
+
+  const res = await generateWorkoutWithAI(prompt)
+  return res
+    .split('\n')
+    .map((s) => s.replace(/^[-*\d.\s]+/, '').trim())
+    .filter(Boolean)
 }
 
 export async function generateDietPlanWithAI(type: 'alimentazione' | 'integrazione', obiettivi: string) {
-  const profile = await getProfile();
-  const context = profile 
+  const profile = await getProfile()
+  const contesto = profile
     ? `Utente: ${profile.altezza}cm, ${profile.peso}kg, obiettivo: ${obiettivi || profile.obiettivi}`
-    : `Obiettivo: ${obiettivi}`;
+    : `Obiettivo: ${obiettivi || 'Massa/Ipertrofia'}`
 
-  const prompt = type === 'alimentazione'
-    ? `Gemma 4, genera un PIANO ALIMENTARE completo per una giornata tipo (Massa/Ipertrofia). 
-       ${context}
+  const prompt =
+    type === 'alimentazione'
+      ? `Genera un PIANO ALIMENTARE completo per una giornata tipo (Massa/Ipertrofia).
+       ${contesto}
        Rispondi esclusivamente in formato CSV usando come separatore il carattere | con queste colonne:
        Orario | Pasto / Fase | Quantità | Note
        Esempio: 08:00 | Colazione Proteica | 150g Yogurt + 50g Avena | Base anabolica`
-    : `Gemma 4, genera un PIANO DI INTEGRAZIONE completo per la performance e il recupero.
-       ${context}
+      : `Genera un PIANO DI INTEGRAZIONE completo per la performance e il recupero.
+       ${contesto}
        Rispondi esclusivamente in formato CSV usando come separatore il carattere | con queste colonne:
        Orario | Integratore | Quantità | Note
-       Esempio: 07:00 | BCAA 4:1:1 | 5g | Protezione muscolare`;
+       Esempio: 07:00 | BCAA 4:1:1 | 5g | Protezione muscolare`
 
-  const res = await generateWorkoutWithAI(prompt);
-  return res;
+  return generateWorkoutWithAI(prompt)
 }
 
-export const callGemini = generateWorkoutWithAI;
-
+export const callGemini = generateWorkoutWithAI

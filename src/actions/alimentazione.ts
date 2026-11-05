@@ -3,6 +3,11 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import type { PianoAlimentazione, RigaPiano, TipoPiano } from '@/types/diet'
+import {
+  NOME_INTEGRAZIONE_MASSA,
+  NOME_PIANO_MASSA,
+  righePerTipo,
+} from '@/lib/seedPianoMassa'
 
 // Re-export dei tipi per comodità dei consumer lato client
 export type { PianoAlimentazione, RigaPiano, TipoPiano }
@@ -243,4 +248,74 @@ export async function migraPianoMassa() {
   }
 
   revalidatePath(REVALIDATE)
+}
+
+// ─── RIPRISTINO DEL PIANO ORIGINALE ───────────────────────
+
+/**
+ * Ricrea il "Piano Massa 93kg" e la relativa integrazione usando i dati originali
+ * salvati in `lib/seedPianoMassa.ts` (utile se il database è stato ricreato o svuotato).
+ * Non fa nulla se i piani esistono già.
+ */
+export async function ripristinaPianoMassa() {
+  const { supabase, user } = await getSupabaseAutenticato()
+
+  const { data: esistenti } = await supabase
+    .from('piani_alimentazione')
+    .select('id, nome, tipo')
+    .eq('user_id', user.id)
+
+  const creati: string[] = []
+
+  for (const tipo of ['alimentazione', 'integrazione'] as const) {
+    const nome = tipo === 'alimentazione' ? NOME_PIANO_MASSA : NOME_INTEGRAZIONE_MASSA
+    const gia = (esistenti ?? []).find((p) => p.nome === nome && p.tipo === tipo)
+    if (gia) continue
+
+    const righeSeed = righePerTipo(tipo)
+    if (righeSeed.length === 0) continue
+
+    const { data: piano, error: errPiano } = await supabase
+      .from('piani_alimentazione')
+      .insert([{ nome, tipo, user_id: user.id }])
+      .select()
+      .single()
+
+    if (errPiano) throw errPiano
+
+    const { error: errRighe } = await supabase.from('righe_piano').insert(
+      righeSeed.map((riga) => ({
+        piano_id: piano.id,
+        orario: riga.orario,
+        voce: `${riga.fase} — ${riga.pasto}`,
+        quantita: riga.quantita,
+        note: riga.sostanza ? `${riga.sostanza} · ${riga.note}`.replace(/ · $/, '') : riga.note,
+        ordine: riga.ordine,
+      })),
+    )
+
+    if (errRighe) throw errRighe
+    creati.push(piano.id)
+  }
+
+  // Abbina automaticamente l'integrazione al piano alimentare
+  if (creati.length > 0) {
+    const { data: piani } = await supabase
+      .from('piani_alimentazione')
+      .select('id, tipo')
+      .eq('user_id', user.id)
+
+    const alimentazione = (piani ?? []).find((p) => p.tipo === 'alimentazione')
+    const integrazione = (piani ?? []).find((p) => p.tipo === 'integrazione')
+
+    if (alimentazione && integrazione) {
+      await supabase
+        .from('piani_alimentazione')
+        .update({ integrazione_abbinata_id: integrazione.id })
+        .eq('id', alimentazione.id)
+    }
+  }
+
+  revalidatePath(REVALIDATE)
+  return creati
 }

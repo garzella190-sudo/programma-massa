@@ -40,6 +40,9 @@ export const viewport: Viewport = {
   themeColor: "#0E1116",
   width: "device-width",
   initialScale: 1,
+  // Il pinch-to-zoom su mobile non serve e rompe i layout della tabella: disattivato.
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
 };

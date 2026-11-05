@@ -2,7 +2,7 @@
 // Genera un PDF A4 del piano alimentare / di integrazione, nello stile Hevy
 // (header blu, tabella compatta, numeri tabulari, file leggero da stampare).
 
-import type { PianoAlimentazione, RigaPiano } from '@/types/diet'
+import { separaFase, type PianoAlimentazione, type RigaPiano } from '@/types/diet'
 import { slugPiano } from '@/lib/slug'
 
 const MM = { pageW: 210, pageH: 297, margin: 16, footer: 20 }
@@ -20,21 +20,45 @@ const C = {
   white: [255, 255, 255] as const,
 }
 
-type Colonna = { key: keyof RigaPiano; label: string; w: number }
+type RigaPdf = {
+  orario: string
+  fase: string
+  voce: string
+  quantita: string
+  note: string
+}
+
+type Colonna = { key: keyof RigaPdf; label: string; w: number }
 
 const COLONNE_ALIMENTAZIONE: Colonna[] = [
-  { key: 'orario', label: 'ORARIO', w: 22 },
-  { key: 'voce', label: 'PASTO / FASE', w: 58 },
-  { key: 'quantita', label: 'QUANTITÀ', w: 46 },
-  { key: 'note', label: 'NOTE', w: 52 },
+  { key: 'orario', label: 'ORARIO', w: 20 },
+  { key: 'fase', label: 'FASE', w: 28 },
+  { key: 'voce', label: 'PASTO', w: 50 },
+  { key: 'quantita', label: 'QUANTITÀ', w: 32 },
+  { key: 'note', label: 'NOTE', w: 48 },
 ]
 
 const COLONNE_INTEGRAZIONE: Colonna[] = [
-  { key: 'orario', label: 'ORARIO', w: 22 },
-  { key: 'voce', label: 'INTEGRATORE', w: 58 },
-  { key: 'quantita', label: 'QUANTITÀ', w: 46 },
-  { key: 'note', label: 'NOTE', w: 52 },
+  { key: 'orario', label: 'ORARIO', w: 20 },
+  { key: 'fase', label: 'FASE', w: 28 },
+  { key: 'voce', label: 'INTEGRATORE', w: 50 },
+  { key: 'quantita', label: 'QUANTITÀ', w: 32 },
+  { key: 'note', label: 'NOTE', w: 48 },
 ]
+
+/** Separa la fase dal nome del pasto e normalizza i campi per il rendering. */
+function perPdf(righe: RigaPiano[]): RigaPdf[] {
+  return righe.map((riga) => {
+    const { fase, pasto } = separaFase(riga.voce)
+    return {
+      orario: riga.orario,
+      fase,
+      voce: pasto,
+      quantita: riga.quantita,
+      note: riga.note,
+    }
+  })
+}
 
 function dataIt(data: Date): string {
   return data.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -140,7 +164,9 @@ export async function generaPianoPdf(
     disegnaIntestazione(colonneCorrenti)
   }
 
-  const disegnaRighe = (righe: RigaPiano[], tint: [number, number, number] | null, colonneRiga: Colonna[]) => {
+  const disegnaRighe = (righePiano: RigaPiano[], tint: [number, number, number] | null, colonneRiga: Colonna[]) => {
+    const righe = perPdf(righePiano)
+
     if (righe.length === 0) {
       doc.setFont('helvetica', 'italic')
       doc.setFontSize(8.5)
@@ -155,9 +181,10 @@ export async function generaPianoPdf(
     for (const riga of righe) {
       // Il testo va misurato con la stessa dimensione con cui verrà disegnato
       const celle = colonneRiga.map((col, i) => {
-        doc.setFont('helvetica', i === 0 ? 'bold' : 'normal')
-        doc.setFontSize(i === ultimaColonna ? 7.8 : 8.6)
-        return doc.splitTextToSize(pulisci(riga[col.key] as string | undefined), col.w - 4) as string[]
+        const isFase = col.key === 'fase'
+        doc.setFont('helvetica', i === 0 || isFase ? 'bold' : 'normal')
+        doc.setFontSize(isFase ? 6.6 : i === ultimaColonna ? 7.8 : 8.6)
+        return doc.splitTextToSize(pulisci(riga[col.key]), col.w - 4) as string[]
       })
       const righeMax = Math.max(1, ...celle.map((c) => c.length))
       const altezza = righeMax * 3.7 + 3.4
@@ -171,10 +198,10 @@ export async function generaPianoPdf(
 
       let x = MM.margin + 2
       colonneRiga.forEach((col, i) => {
-        const prima = i === 0
-        doc.setFont('helvetica', prima ? 'bold' : 'normal')
-        doc.setFontSize(i === ultimaColonna ? 7.8 : 8.6)
-        setInk(prima ? C.ink : i === ultimaColonna ? C.ink2 : C.ink)
+        const isFase = col.key === 'fase'
+        doc.setFont('helvetica', i === 0 || isFase ? 'bold' : 'normal')
+        doc.setFontSize(isFase ? 6.6 : i === ultimaColonna ? 7.8 : 8.6)
+        setInk(isFase ? C.accent : i === 0 ? C.ink : i === ultimaColonna ? C.ink2 : C.ink)
 
         doc.text(celle[i].length > 0 ? celle[i] : ['-'], x, y + 4.6)
         x += col.w

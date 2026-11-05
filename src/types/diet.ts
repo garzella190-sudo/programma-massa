@@ -26,32 +26,25 @@ export interface PianoAlimentazione {
 export const CAMPI_RIGA = ['orario', 'voce', 'quantita', 'note'] as const
 export type CampoRiga = (typeof CAMPI_RIGA)[number]
 
-export interface ColonnaRiga {
-  key: CampoRiga
-  label: string
-  /** Classi Tailwind di larghezza (tabella in flex) */
-  width: string
+/**
+ * Nel DB la fase è salvata come prefisso della voce: "Colazione — Yogurt e Muesli".
+ * Restituisce le due parti separate, per mostrarle come badge + titolo leggibile.
+ */
+export function separaFase(voce: string | null | undefined): { fase: string; pasto: string } {
+  const testo = (voce ?? '').trim()
+  const match = testo.match(/^(.+?)\s*[—–]\s*(.+)$/)
+  if (!match) return { fase: '', pasto: testo }
+  return { fase: match[1].trim(), pasto: match[2].trim() }
 }
 
-export const COLONNE_ALIMENTAZIONE: ColonnaRiga[] = [
-  { key: 'orario', label: 'Orario', width: 'w-[68px]' },
-  { key: 'voce', label: 'Pasto / Fase', width: 'flex-1 min-w-[150px]' },
-  { key: 'quantita', label: 'Quantità', width: 'w-[104px]' },
-  { key: 'note', label: 'Note', width: 'w-[150px]' },
-]
-
-export const COLONNE_INTEGRAZIONE: ColonnaRiga[] = [
-  { key: 'orario', label: 'Orario', width: 'w-[68px]' },
-  { key: 'voce', label: 'Integratore', width: 'flex-1 min-w-[150px]' },
-  { key: 'quantita', label: 'Quantità (mg/CPR)', width: 'w-[150px]' },
-  { key: 'note', label: 'Note', width: 'w-[130px]' },
-]
-
-export function colonnePer(tipo: TipoPiano): ColonnaRiga[] {
-  return tipo === 'alimentazione' ? COLONNE_ALIMENTAZIONE : COLONNE_INTEGRAZIONE
+/** Compone la voce salvata nel DB a partire da fase + pasto. */
+export function componiVoce(fase: string, pasto: string): string {
+  const f = fase.trim()
+  const p = pasto.trim()
+  return f ? `${f} — ${p}` : p
 }
 
-/** Riga mostrata in tabella: può essere la riga di un piano o di un'integrazione abbinata. */
+/** Riga mostrata in tabella: può venire dal piano o dall'integrazione abbinata. */
 export interface RigaVisualizzata extends RigaPiano {
   isIntegration?: boolean
 }

@@ -35,8 +35,17 @@ npm install
 ```env
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+# IA — opzione A: Google Gemini (chiave nativa)
 GEMINI_API_KEY=...
+# IA — opzione B: qualsiasi provider compatibile OpenAI (ha precedenza se presente)
+# AI_BASE_URL=https://api.openai.com/v1
+# AI_API_KEY=...
+# AI_MODEL=gpt-4o-mini
 ```
+
+> L'IA è opzionale: senza chiave l'app funziona, i pulsanti IA mostrano un errore esplicativo.
+> Lo stato di backend e IA è esposto da `/api/health`.
+
 
 ```bash
 npm run dev      # sviluppo
